@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+    <title>Air Tunnel Aerodynamics - Final Proposal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <link rel="stylesheet" type="text/css" href="style.css">
+
+<body>
+<div class="container">
+    <div class="row">
+        <div id="main" class="section col s19 m12 xl9 offset-xl1">
+            <h2>Air Tunnel Aerodynamics</h2>
+            <h3 class="name">by Alexandru Petrusca - CMPS 161 Winter 2019</h3>
+
+            <div id="description" class="section scrollspy">
+                <h3>High-Level Description</h3>
+                <p>
+                    Aerodynamic testing is a primary concern for companies specializing in aircraft and automotive
+                    manufacturing. Physical testing of aerodynamic forces on transportation vehicles is commonly
+                    achieved with the aid of wind tunnels, large tubes with air moving inside used to copy the actions
+                    of an object in flight. This project focuses on digitally simulating the operations of a wind tunnel
+                    and developing different techniques to visualize the air flow within the tunnel as it interacts with
+                    obstacle objects. The project is composed of two main parts: the simulation and the visualization.
+                    For the simulation, the Navier-Stokes equations are used to model the air flow through the tunnel.
+                    For the visualization, my application incorporates heat maps to visualize wind velocity and pressure,
+                    and uses texture advected material to visualize the movement of wind inside the tunnel in two dimensions.
+                </p>
+                <a href="../final_report.pdf">Final Report</a>
+                <a href="">Source Code</a>
+                <img src="cap1.png">
+                <img src="cap2.png">
+
+                <h3>User Guide</h3>
+                <p>
+                    <b>Instructions to Run:</b>
+                    <br><br>
+
+                    To run my main app, simply run wind-tunnel.html on a local server (such as python3's http.server).
+                    Then connect to that server and open wind-tunnel.html from it to run my application in browser.
+                    <br>
+
+                    <br><br>
+
+                    <b>Instructions to Use:</b>
+                    <br><br>
+
+                    To switch visualization modes, simply use the buttons at the bottom of the HTML canvas. These options
+                    include "Material View", "Velocity View", and "Pressure View".
+                    <br><br>
+                    To switch the object the simulation is running on, use the select dropdown element labelled "Select Object"
+                    to choose a new object. The simulation will automatically start over again with the new object selected.
+                    <br><br>
+                    Use the "Reset" button to restart the simulation.
+                    <br><br>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

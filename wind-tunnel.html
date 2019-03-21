@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=400">
+
+    <title>Wind Tunnel</title>
+
+    <link rel="stylesheet" type="text/css" href="wind-tunnel.css">
+
+    <script id="obstacle_render_fragment" type="x-shader/x-fragment">
+        precision highp float;
+
+        void main() {
+            vec2 coords = gl_FragCoord.xy;
+
+//            if (coords.x > 200.0 && coords.x < 400.0 && coords.y > 275.0 && coords.y < 475.0) {
+//                gl_FragColor = vec4(0, 0, 0, 1);
+//            } else {
+//                gl_FragColor = vec4(1, 1, 1, 1);
+//            }
+//
+            vec2 dir = coords - vec2(375.0, 375.0);
+            if (length(dir) < 100.0) {
+                gl_FragColor = vec4(0, 0, 0, 1);
+            } else {
+                gl_FragColor = vec4(1, 1, 1, 1);
+            }
+        }
+    </script>
+
+    <script id="obstacle_velocity_fragment" type="x-shader/x-fragment">
+        precision highp float;
+
+        uniform sampler2D u_velocity;
+        uniform sampler2D u_obstacle;
+        uniform vec2 u_textureSize;
+
+        void main() {
+            vec2 coords = gl_FragCoord.xy;
+            vec2 obstacle_coords = vec2(coords.x / u_textureSize.x, 1.0 - coords.y / u_textureSize.y);
+
+            float obstacle_val = texture2D(u_obstacle, obstacle_coords).x;
+            if (obstacle_val < 0.5) {
+                gl_FragColor = vec4(0, 0, 0, 0); // no slip boundary condition
+            } else {
+                gl_FragColor = texture2D(u_velocity, coords / u_textureSize);
+            }
+        }
+    </script>
+
+    <script id="obstacle_pressure_fragment" type="x-shader/x-fragment">
+        precision highp float;
+
+        uniform sampler2D u_pressure;
+        uniform sampler2D u_obstacle;
+        uniform vec2 u_textureSize;
+
+        void main() {
+            vec2 coords = gl_FragCoord.xy;
+            vec2 obstacle_coords = vec2(coords.x / u_textureSize.x, 1.0 - coords.y / u_textureSize.y);
+
+            float obstacle_val = texture2D(u_obstacle, obstacle_coords).x;
+//            if (obstacle_val < 0.5) {
+//                gl_FragColor = vec4(1, 0, 0, 0);
+//            } else {
+                gl_FragColor = texture2D(u_pressure, coords / u_textureSize);
+//            }
+        }
+    </script>
+
+    <script id="jacobi_diffusion_fragment" type="x-shader/x-fragment">
+        precision mediump float;
+
+        uniform sampler2D u_divergence;
+        uniform sampler2D u_pressure;
+        uniform vec2 u_textureSize;
+
+        void main() {
+            vec2 coords = gl_FragCoord.xy;
+            vec2 up = vec2(0.0, 1.0);
+            vec2 down = vec2(0.0, -1.0);
+            vec2 right = vec2(1.0, 0.0);
+            vec2 left = vec2(-1.0, 0.0);
+
+            vec2 xUp = texture2D(u_pressure, (coords + up) / u_textureSize).xy;
+            vec2 xDown = texture2D(u_pressure, (coords + down) / u_textureSize).xy;
+            vec2 xRight = texture2D(u_pressure, (coords + right) / u_textureSize).xy;
+            vec2 xLeft = texture2D(u_pressure, (coords + left) / u_textureSize).xy;
+
+            vec2 bCurr = texture2D(u_divergence, coords / u_textureSize).xy;
+            vec2 xNew = 0.25 * (xUp + xDown + xRight + xLeft - bCurr);
+            gl_FragColor = vec4(xNew, 0, 0);
+        }
+    </script>
+
+    <script id="divergence_fragment" type="x-shader/x-fragment">
+        precision mediump float;
+
+        uniform sampler2D u_velocity;
+        uniform vec2 u_textureSize;
+
+        void main() {
+            vec2 coords = gl_FragCoord.xy;
+            vec2 up = vec2(0.0, 1.0);
+            vec2 down = vec2(0.0, -1.0);
+            vec2 right = vec2(1.0, 0.0);
+            vec2 left = vec2(-1.0, 0.0);
+
+            vec4 wUp = texture2D(u_velocity, (coords + up) / u_textureSize);
+            vec4 wDown = texture2D(u_velocity, (coords + down) / u_textureSize);
+            vec4 wRight = texture2D(u_velocity, (coords + right) / u_textureSize);
+            vec4 wLeft = texture2D(u_velocity, (coords + left) / u_textureSize);
+
+            float divergence = 0.5 * ((wRight.x - wLeft.x) + (wUp.y - wDown.y));
+            gl_FragColor = vec4(divergence, 0, 0, 0);
+        }
+    </script>
+
+    <script id="gradient_subtraction_fragment" type="x-shader/x-fragment">
+        precision mediump float;
+
+        uniform sampler2D u_velocity;
+        uniform sampler2D u_pressure;
+        uniform vec2 u_textureSize;
+
+        void main() {
+            vec2 coords = gl_FragCoord.xy;
+            vec2 up = vec2(0.0, 1.0);
+            vec2 down = vec2(0.0, -1.0);
+            vec2 right = vec2(1.0, 0.0);
+            vec2 left = vec2(-1.0, 0.0);
+
+            float pUp = texture2D(u_pressure, (coords + up) / u_textureSize).x;
+            float pDown = texture2D(u_pressure, (coords + down) / u_textureSize).x;
+            float pRight = texture2D(u_pressure, (coords + right) / u_textureSize).x;
+            float pLeft = texture2D(u_pressure, (coords + left) / u_textureSize).x;
+
+            vec2 currVelocity = texture2D(u_velocity, coords / u_textureSize).xy;
+            gl_FragColor = vec4(currVelocity - 0.5 * vec2(pRight - pLeft, pUp - pDown), 0, 0);
+        }
+    </script>
+
+    <script id="advect_velocity_fragment" type="x-shader/x-fragment">
+        precision mediump float;
+
+        uniform sampler2D u_velocity;
+        uniform vec2 u_textureSize;
+
+        // texture bilinear interpolation
+        vec2 bilerp(vec2 pos, sampler2D texture, vec2 size){
+            vec2 pxCenter = vec2(0.5, 0.5);
+            vec2 ceiled = ceil(pos);
+            vec2 floored = floor(pos);
+
+            vec2 topLeft = texture2D(texture, (floored + pxCenter) / size).xy;
+            vec2 topRight = texture2D(texture, (vec2(floored.x + 1.0, floored.y) + pxCenter) / size).xy;
+            vec2 bottomLeft = texture2D(texture, (vec2(floored.x, floored.y + 1.0) + pxCenter) / size).xy;
+            vec2 bottomRight = texture2D(texture, (ceiled + pxCenter) / size).xy;
+
+            vec2 top = mix(topLeft, topRight, pos.x - floored.x);
+            vec2 bot = mix(bottomLeft, bottomRight, pos.x - floored.x);
+
+            return mix(top, bot, pos.y - floored.y);
+        }
+
+        void main() {
+            vec2 pxCenter = vec2(0.5, 0.5);
+            vec2 coords = gl_FragCoord.xy;
+            vec2 currentVelocity = texture2D(u_velocity, coords / u_textureSize).xy;
+            vec2 pos = (coords - pxCenter) - currentVelocity;
+
+            if (pos.x < 1.0) {
+                gl_FragColor = vec4(1, 0, 0, 0);
+            } else {
+                vec2 velocity = bilerp(pos, u_velocity, u_textureSize);
+                gl_FragColor = vec4(velocity, 0, 0);
+            }
+        }
+    </script>
+
+    <script id="advect_material_fragment" type="x-shader/x-fragment">
+        precision highp float;
+
+        uniform sampler2D u_velocity;
+        uniform sampler2D u_material;
+        uniform vec2 u_textureSize;
+        uniform vec2 u_screenSize;
+
+        // texture bilinear interpolation
+        vec2 bilerp(vec2 pos, sampler2D texture, vec2 size){
+            vec2 pxCenter = vec2(0.5, 0.5);
+            vec2 ceiled = ceil(pos);
+            vec2 floored = floor(pos);
+
+            vec2 topLeft = texture2D(texture, (floored + pxCenter) / size).xy;
+            vec2 topRight = texture2D(texture, (vec2(floored.x + 1.0, floored.y) + pxCenter) / size).xy;
+            vec2 bottomLeft = texture2D(texture, (vec2(floored.x, floored.y + 1.0) + pxCenter) / size).xy;
+            vec2 bottomRight = texture2D(texture, (ceiled + pxCenter) / size).xy;
+
+            vec2 top = mix(topLeft, topRight, pos.x - floored.x);
+            vec2 bot = mix(bottomLeft, bottomRight, pos.x - floored.x);
+
+            return mix(top, bot, pos.y - floored.y);
+        }
+
+        void main() {
+            vec2 coords = gl_FragCoord.xy;
+            vec2 pxCenter = vec2(0.5, 0.5);
+
+            // bilinear interp velocity
+            vec2 scale = u_textureSize/ u_screenSize;
+            vec2 posVel = (coords - pxCenter) * scale + pxCenter;
+            vec2 currentVelocity = 1.0 / scale * bilerp(posVel, u_velocity, u_screenSize * scale);
+            vec2 posMat = (coords - pxCenter) - currentVelocity;
+
+            // implicitly solve advection
+            if (coords.x < 1.0) {
+                float numCols = 2.0 * floor(u_screenSize.y / 20.0);
+                float numPx = u_screenSize.y / numCols;
+                if (floor(mod((coords.y - 2.0) / numPx, 2.0)) == 0.0) {
+                    gl_FragColor = vec4(1, 0, 0, 0);
+                } else {
+                    gl_FragColor = vec4(0, 0, 0, 0);
+                }
+
+//                if (coords.y > 360.0 && coords.y < 390.0) {
+//                    gl_FragColor = vec4(1, 0, 0, 0);
+//                } else {
+//                    gl_FragColor = vec4(0, 0, 0, 0);
+//                }
+
+//                if (coords.y > 355.0 && coords.y < 365.0 || coords.y > 385.0 && coords.y < 395.0) {
+//                    gl_FragColor = vec4(1, 0, 0, 0);
+//                } else if(coords.y > 335.0 && coords.y < 345.0 || coords.y > 405.0 && coords.y < 415.0) {
+//                    gl_FragColor = vec4(1, 0, 0, 0);
+//                } else {
+//                    gl_FragColor = vec4(0, 0, 0, 0);
+//                }
+            } else {
+                posMat.y = mod(posMat.y, u_screenSize.y - 1.0);
+                gl_FragColor = vec4(bilerp(posMat, u_material, u_screenSize), 0, 0);
+            }
+        }
+    </script>
+
+    <script id="render_fragment" type="x-shader/x-fragment">
+        precision mediump float;
+
+        uniform sampler2D u_material;
+        uniform sampler2D u_obstacle;
+        uniform vec2 u_textureSize;
+        uniform vec2 u_screenSize;
+
+        // texture bilinear interpolation
+        vec2 bilerp(vec2 pos, sampler2D texture, vec2 size){
+            vec2 pxCenter = vec2(0.5, 0.5);
+            vec2 ceiled = ceil(pos);
+            vec2 floored = floor(pos);
+
+            vec2 topLeft = texture2D(texture, (floored + pxCenter) / size).xy;
+            vec2 topRight = texture2D(texture, (vec2(floored.x + 1.0, floored.y) + pxCenter) / size).xy;
+            vec2 bottomLeft = texture2D(texture, (vec2(floored.x, floored.y + 1.0) + pxCenter) / size).xy;
+            vec2 bottomRight = texture2D(texture, (ceiled + pxCenter) / size).xy;
+
+            vec2 top = mix(topLeft, topRight, pos.x - floored.x);
+            vec2 bot = mix(bottomLeft, bottomRight, pos.x - floored.x);
+
+            return mix(top, bot, pos.y - floored.y);
+        }
+
+        float boundedLerp(float a, float b, float t) {
+            float mx = max(a, b);
+            float mn = min(a, b);
+
+            float val = mix(a, b, t);
+            if (val > mx) {
+                return mx;
+            } else if (val < mn) {
+                return mn;
+            } else {
+                return val;
+            }
+        }
+
+        vec3 transfer(float wind_speed) {
+            float r_peak = 1.0;
+            float g_peak = 0.625;
+            float b_peak = 0.25;
+            float width = 1.0;
+
+            // red component definition
+            float r_comp = 0.0;
+            if (wind_speed >= r_peak) {
+                r_comp = 1.0;
+            } else {
+                r_comp = boundedLerp(1.0, 0.0, (r_peak - wind_speed) / width);
+            }
+
+            // green component definition
+            float g_comp = 0.0;
+            if (wind_speed == g_peak) {
+                g_comp = 1.0;
+            } else if (wind_speed > g_peak) {
+                g_comp = boundedLerp(1.0, 0.0, (wind_speed - g_peak) / width);
+            } else {
+                g_comp = boundedLerp(1.0, 0.0, (g_peak - wind_speed) / width);
+            }
+
+            // blue component definition
+            float b_comp = 0.0;
+            if (wind_speed <= b_peak) {
+                b_comp = 1.0;
+            } else {
+                b_comp = boundedLerp(1.0, 0.0, (wind_speed - b_peak) / width);
+            }
+
+            vec3 color = vec3(r_comp, g_comp, b_comp);
+            return normalize(exp(color));
+        }
+
+        void main() {
+            vec2 coords = gl_FragCoord.xy;
+            vec2 obstacle_coords = vec2(coords.x / u_screenSize.x, 1.0 - coords.y / u_screenSize.y);
+
+            float obstacle_val = texture2D(u_obstacle, obstacle_coords).x;
+            if (obstacle_val < 0.5) {
+                gl_FragColor = vec4(1, 1, 1, 1);
+            } else {
+                vec2 scale = u_textureSize / u_screenSize;
+                vec2 wind_velocity = bilerp(scale * coords, u_material, u_textureSize);
+                float wind_speed = length(wind_velocity);
+                gl_FragColor = vec4(transfer(wind_speed), 1);
+            }
+        }
+    </script>
+
+    <script id="reset_velocity_fragment" type="x-shader/x-fragment">
+        precision mediump float;
+
+        void main() {
+            gl_FragColor = vec4(0.5, 0.0, 0.0, 0.0);
+        }
+    </script>
+
+    <script id="vertex" type="x-shader/x-vertex">
+        attribute vec2 a_position;
+
+        void main() {
+           gl_Position = vec4(a_position.x, a_position.y, 0, 1);
+        }
+    </script>
+
+    <script type="text/javascript" src="lib/GlBoilerplate.js"></script>
+    <script type="text/javascript" src="util.js"></script>
+    <script type="text/javascript" src="wind-tunnel.js"></script>
+</head>
+<body>
+
+<canvas id="myCanvas" width="1500px" height="750px"></canvas>
+<br>
+<button id="material" onclick="materialView()">Material View</button>
+<button id="velocity" onclick="velocityView()">Velocity View</button>
+<button id="pressure" onclick="pressureView()">Pressure View</button>
+<button id="reset" onclick="resetWindow()">Reset</button>
+
+<label for="object-select">Select Object: </label>
+<select id="object-select">
+    <option value="circle.jpg" selected>Circle</option>
+    <option value="square.jpg">Square</option>
+    <option value="octagon.jpg">Octagon</option>
+    <option value="teardrop.jpg">Tear Drop</option>
+    <option value="wing.jpg">Wing 1</option>
+    <option value="wing2.jpg">Wing 2</option>
+    <option value="wing3.jpg">Wing 3</option>
+    <option value="car.jpg">Standard Car</option>
+    <option value="van.jpg">Mini-Van Car</option>
+    <option value="oldcar.jpg">Retro Car</option>
+    <option value="airplane.jpg">Airplane</option>
+    <option value="jet.jpg">Jet Fighter</option>
+    <option value="dancer.jpg">Dancer</option>
+    <option value="evolution.jpg">Evolution</option>
+    <option value="hills.jpg">Hills</option>
+    <option value="heads.jpg">Movie Heads</option>
+</select>
+
+</body>
+</html>
