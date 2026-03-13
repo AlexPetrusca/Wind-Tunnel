@@ -18,6 +18,8 @@ Instructions to Run:
 To run my main app, simply run wind-tunnel.html on a local server (such as python3's http.server).
 Then connect to that server and open wind-tunnel.html from it to run my application in browser.
 
+You can also try it here: https://alexpetrusca.github.io/tunnel
+
 
 Instructions to Use:
 
